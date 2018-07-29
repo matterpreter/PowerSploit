@@ -2975,6 +2975,57 @@ function Get-UnattendedInstallFile {
     $ErrorActionPreference = $OrigError
 }
 
+function Get-WSDSetupInfo {
+<#
+    .SYNOPSIS
+    
+        Checks for the presence of the setupinfo.bak file left behind by
+        Windows Deployment Server after Windows installation completes.
+    
+        Author: Matt Hand (@matterpreter)
+        License: BSD 3-Clause
+        Required Dependencies: None
+
+    .EXAMPLE
+
+        Get-WSDSetupInfo
+
+        Finds any remaining setupinfo.bak installation backup files.
+
+    .LINK
+
+        http://blog.win-fu.com/2017/08/stored-passwords-found-all-over-place.html
+
+    .OUTPUTS
+
+        PowerUp.WSDSetupInfo
+
+        Custom PSObject containing results.
+#>
+
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSShouldProcess', '')]
+    [OutputType('PowerUp.WSDSetupInfo')]
+    [CmdletBinding()]
+    Param()
+
+    $OrigError = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+
+    $SearchLocations = @(   "c:\windows\panther\setupinfo.bak",
+                            (Join-Path $Env:WinDir "\Panther\setupinfo.bak"),
+                        )
+
+    # test the existence of the file in the above paths
+    $SearchLocations | Where-Object { Test-Path $_ } | ForEach-Object {
+        $Out = New-Object PSObject
+        $Out | Add-Member Noteproperty 'WDSSetupInfo' $_
+        $Out | Add-Member Aliasproperty Name WDSSetupInfo
+        $Out.PSObject.TypeNames.Insert(0, 'PowerUp.WDSSetupInfo')
+        $Out
+    }
+
+    $ErrorActionPreference = $OrigError
+}
 
 function Get-WebConfig {
 <#
@@ -3906,6 +3957,13 @@ function Invoke-AllChecks {
 
     "`n`n[*] Checking for unattended install files..."
     $Results = Get-UnattendedInstallFile
+    $Results | Format-List
+    if($HTMLReport) {
+        $Results | ConvertTo-HTML -Head $Header -Body "<H2>Unattended Install Files</H2>" | Out-File -Append $HtmlReportFile
+    }
+    
+    "`n`n[*] Checking for WDS backup files..."
+    $Results = Get-WDSSetupInfo
     $Results | Format-List
     if($HTMLReport) {
         $Results | ConvertTo-HTML -Head $Header -Body "<H2>Unattended Install Files</H2>" | Out-File -Append $HtmlReportFile
